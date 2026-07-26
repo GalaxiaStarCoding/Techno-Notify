@@ -28,7 +28,7 @@
 // ─── Bridge Configuration ───────────────────────────────────────────
 // Change this to your deployed WebSocket bridge server URL.
 // Example: "wss://my-tt5-bridge.example.com/ws"
-const BRIDGE_URL = "";
+const BRIDGE_URL = "wss://techno-notify.onrender.com/ws";
 
 export function getBridgeUrl() {
   return (
