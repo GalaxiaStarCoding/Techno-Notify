@@ -1,5 +1,6 @@
-# Docker build for the Techno-Notify TT5 bridge.
 FROM python:3.11-slim
+
+ARG TTSDK_URL
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         p7zip-full ca-certificates curl \
@@ -11,10 +12,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 RUN set -eux; \
-    curl -fsSL --retry 3 --retry-delay 5 \
+    test -n "$TTSDK_URL"; \
+    curl -fsSL \
         -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-        -o /tmp/tt5sdk.7z \
-        "https://www.bearware.dk/teamtalksdk/v5.22a/tt5sdk_v5.22a_ubuntu22_x86_64.7z"; \
+        -o /tmp/tt5sdk.7z "$TTSDK_URL"; \
     mkdir -p /tmp/ttsdk; \
     7z x /tmp/tt5sdk.7z -o/tmp/ttsdk >/dev/null; \
     SDKROOT="/tmp/ttsdk/$(ls /tmp/ttsdk | head -n1)"; \
