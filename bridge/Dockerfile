@@ -1,23 +1,19 @@
-F# Docker build for the Techno-Notify TT5 bridge.
+# Docker build for the Techno-Notify TT5 bridge.
 #
-# bearware.dk refuses Render's cloud IPs (HTTP 454 / curl exit code 22),
-# so we can't fetch the TeamTalk5 SDK from there during the Render build.
-# Instead you host the SDK .7z once on catbox.moe (or any host that gives a
-# direct download link) and point the build at it via the TTSDK_URL env
-# var. Render auto-converts environment variables into Docker build args.
+# teamtalk.py downloads the TeamTalk5 SDK at RUNTIME by scraping
+# https://bearware.dk/teamtalksdk. That host returns HTTP 454 to Render's
+# IPs (its scraper is also outdated — the listing no longer contains the
+# "5.15" folder it searches for). To make deploys reliable we instead bake
+# the SDK into the image ourselves, so teamtalk.py finds the local libs on
+# import and never triggers a download.
 #
-# Deploy as a Render "Docker" web service.
-#
-# One-time setup:
-#   1. Go to https://catbox.moe/main.php , upload tt5sdk.7z, copy the
-#      direct link it returns (looks like https://files.catbox.moe/xxxx.7z).
-#   2. In Render -> Environment, add a variable TTSDK_URL = that link.
+# You MUST deploy this as a Render "Docker" web service (Render's native
+# Python runtime can't apt-install 7z).
 FROM python:3.11-slim
 
-ARG TTSDK_URL
-
+# 7z to extract the committed SDK archive; ca-certs for HTTPS.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        p7zip-full ca-certificates curl \
+        p7zip-full ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -25,15 +21,13 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Fetch the SDK .7z from TTSDK_URL (your catbox link) and inject
-# Library/TeamTalk_DLL + Library/TeamTalkPy into the installed teamtalk.py
-# package — exactly where its __init__ looks — so the import-time download
-# never runs.
+# --- Inject the TeamTalk5 SDK into the installed teamtalk.py package ---
+# Put tt5sdk.7z (downloaded once from bearware.dk on a normal network) in
+# this folder and commit it. We extract it and drop Library/TeamTalk_DLL
+# and Library/TeamTalkPy into teamtalk/implementation/, exactly where
+# teamtalk.py's __init__ looks, so import-time download_sdk() never runs.
+COPY tt5sdk.7z /tmp/tt5sdk.7z
 RUN set -eux; \
-    test -n "$TTSDK_URL"; \
-    curl -fsSL \
-        -A "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
-        -o /tmp/tt5sdk.7z "$TTSDK_URL"; \
     mkdir -p /tmp/ttsdk; \
     7z x /tmp/tt5sdk.7z -o/tmp/ttsdk >/dev/null; \
     SDKROOT="/tmp/ttsdk/$(ls /tmp/ttsdk | head -n1)"; \
