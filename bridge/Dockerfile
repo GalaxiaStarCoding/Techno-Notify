@@ -1,3 +1,17 @@
+F# Docker build for the Techno-Notify TT5 bridge.
+#
+# bearware.dk refuses Render's cloud IPs (HTTP 454 / curl exit code 22),
+# so we can't fetch the TeamTalk5 SDK from there during the Render build.
+# Instead you host the SDK .7z once on catbox.moe (or any host that gives a
+# direct download link) and point the build at it via the TTSDK_URL env
+# var. Render auto-converts environment variables into Docker build args.
+#
+# Deploy as a Render "Docker" web service.
+#
+# One-time setup:
+#   1. Go to https://catbox.moe/main.php , upload tt5sdk.7z, copy the
+#      direct link it returns (looks like https://files.catbox.moe/xxxx.7z).
+#   2. In Render -> Environment, add a variable TTSDK_URL = that link.
 FROM python:3.11-slim
 
 ARG TTSDK_URL
@@ -11,6 +25,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Fetch the SDK .7z from TTSDK_URL (your catbox link) and inject
+# Library/TeamTalk_DLL + Library/TeamTalkPy into the installed teamtalk.py
+# package — exactly where its __init__ looks — so the import-time download
+# never runs.
 RUN set -eux; \
     test -n "$TTSDK_URL"; \
     curl -fsSL \
